@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analytics-spine/pack-manifest/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "schemaVersion",
+    "id",
+    "version",
+    "classification",
+    "erp",
+    "processes",
+    "engine",
+    "licence",
+    "provenance",
+    "files",
+    "proof",
+    "claims"
+  ],
+  "properties": {
+    "kind": {
+      "const": "analytics-spine-domain-pack"
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "classification": {
+      "enum": [
+        "curated-commercial",
+        "public-fixture"
+      ]
+    },
+    "erp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "sourceSchemaDigest"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceSchemaDigest": {
+          "type": "string",
+          "pattern": "^sha256(?:-lf)?:[0-9a-f]{64}$",
+          "x-file-reference": {
+            "path": "files[role=source-map,sha256=this].path",
+            "domain": "digestFile: TEXT_EXTENSIONS CRLF-only normalization; otherwise raw bytes"
+          }
+        }
+      }
+    },
+    "processes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "minItems": 1,
+      "maxItems": 1024,
+      "uniqueItems": true
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimumVersion",
+        "maximumExclusiveVersion"
+      ],
+      "properties": {
+        "minimumVersion": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "maximumExclusiveVersion": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        }
+      }
+    },
+    "licence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record",
+        "decisionDigest",
+        "documentDigest",
+        "noticePaths"
+      ],
+      "properties": {
+        "record": {
+          "const": "OD-LEGAL"
+        },
+        "decisionDigest": {
+          "type": "string",
+          "pattern": "^sha256(?:-lf)?:[0-9a-f]{64}$",
+          "x-file-reference": {
+            "path": "admitted OD-LEGAL record",
+            "domain": "digestFile: TEXT_EXTENSIONS CRLF-only normalization; otherwise raw bytes"
+          }
+        },
+        "documentDigest": {
+          "type": "string",
+          "pattern": "^sha256(?:-lf)?:[0-9a-f]{64}$",
+          "x-file-reference": {
+            "path": "licence.noticePaths[0]",
+            "domain": "digestFile: TEXT_EXTENSIONS CRLF-only normalization; otherwise raw bytes"
+          }
+        },
+        "noticePaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "maxItems": 1024,
+          "uniqueItems": true
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record",
+        "decisionDigest",
+        "reviewDigest"
+      ],
+      "properties": {
+        "record": {
+          "const": "OD-HARVEST"
+        },
+        "decisionDigest": {
+          "type": "string",
+          "pattern": "^sha256(?:-lf)?:[0-9a-f]{64}$",
+          "x-file-reference": {
+            "path": "admitted OD-HARVEST record",
+            "domain": "digestFile: TEXT_EXTENSIONS CRLF-only normalization; otherwise raw bytes"
+          }
+        },
+        "reviewDigest": {
+          "type": "string",
+          "pattern": "^sha256(?:-lf)?:[0-9a-f]{64}$",
+          "x-file-reference": {
+            "path": "files[role=proof-reference,sha256=this].path",
+            "domain": "digestFile: TEXT_EXTENSIONS CRLF-only normalization; otherwise raw bytes"
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "role"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256(?:-lf)?:[0-9a-f]{64}$",
+            "x-file-reference": {
+              "path": "this.path",
+              "domain": "digestFile: TEXT_EXTENSIONS CRLF-only normalization; otherwise raw bytes"
+            }
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16777216
+          },
+          "role": {
+            "enum": [
+              "process",
+              "source-map",
+              "oracle-template",
+              "contract",
+              "scenario",
+              "notice",
+              "proof-reference"
+            ]
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 1024,
+      "uniqueItems": true
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalogueDigest",
+        "expectationsDigest",
+        "resultsDigest",
+        "attestationDigest",
+        "sourceHead"
+      ],
+      "properties": {
+        "catalogueDigest": {
+          "type": "string",
+          "pattern": "^sha256(?:-lf)?:[0-9a-f]{64}$",
+          "x-file-reference": {
+            "path": "files[role=proof-reference,sha256=this].path",
+            "domain": "digestFile: TEXT_EXTENSIONS CRLF-only normalization; otherwise raw bytes"
+          }
+        },
+        "expectationsDigest": {
+          "type": "string",
+          "pattern": "^sha256(?:-lf)?:[0-9a-f]{64}$",
+          "x-file-reference": {
+            "path": "files[role=proof-reference,sha256=this].path",
+            "domain": "digestFile: TEXT_EXTENSIONS CRLF-only normalization; otherwise raw bytes"
+          }
+        },
+        "resultsDigest": {
+          "type": "string",
+          "pattern": "^sha256(?:-lf)?:[0-9a-f]{64}$",
+          "x-file-reference": {
+            "path": "files[role=proof-reference,sha256=this].path",
+            "domain": "digestFile: TEXT_EXTENSIONS CRLF-only normalization; otherwise raw bytes"
+          }
+        },
+        "attestationDigest": {
+          "type": "string",
+          "pattern": "^sha256(?:-lf)?:[0-9a-f]{64}$",
+          "x-file-reference": {
+            "path": "files[role=proof-reference,sha256=this].path",
+            "domain": "digestFile: TEXT_EXTENSIONS CRLF-only normalization; otherwise raw bytes"
+          }
+        },
+        "sourceHead": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "scenarioIds",
+          "scopeDigest"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "scenarioIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "maxItems": 1024,
+            "uniqueItems": true
+          },
+          "scopeDigest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "x-digest-domain": "canonical JSON claim scope"
+          }
+        }
+      },
+      "minItems": 0,
+      "maxItems": 1024,
+      "uniqueItems": true
+    }
+  }
+}
