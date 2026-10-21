@@ -15,7 +15,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "lint": "eslint src tests tools eslint.config.js --max-warnings 0",
-    "test": "npm run build && vitest run",
+    "test": "npm run build && vitest run --testTimeout=30000",
     "build": "tsc",
     "gate": "npm run typecheck && npm run lint && npm test",
     "scan:public": "node tools/scan-public.mjs"

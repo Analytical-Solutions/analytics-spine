@@ -10,7 +10,9 @@ npm run scan:public
 ```
 
 The gate runs strict TypeScript checks for source and tests, ESLint, all Vitest
-tests, and the distributable build. It requires no database or network after
+tests, and the distributable build. Filesystem/security tests have a bounded
+30-second per-test timeout to allow full ancestor checks on Windows. The gate
+requires no database or network after
 dependency installation. The build produces ignored `dist/` output. Importing
 the library starts no CLI or network operation. Subprocesses in tooling/tests
 must set `windowsHide: true`.
