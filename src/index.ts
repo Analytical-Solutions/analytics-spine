@@ -88,18 +88,30 @@ export function signatureMessage(signature: PackSignature): Buffer {
   return Buffer.from(['analytics-spine/domain-pack/v1', signature.manifestDigest, signature.proof.keyId, signature.signedAt].join('\0'), 'utf8');
 }
 
+function spkiKey(bytes: Buffer, mismatchCode: 'PACK_PUBLISHER_UNTRUSTED' | 'PACK_SCHEMA_INVALID' = 'PACK_PUBLISHER_UNTRUSTED'): KeyObject {
+  let key: KeyObject;
+  try { key = createPublicKey({ key: bytes, type: 'spki', format: 'der' }); }
+  catch { refuse('PACK_PUBLISHER_UNTRUSTED'); }
+  if (key.asymmetricKeyType !== 'ed25519') refuse('PACK_PUBLISHER_UNTRUSTED');
+  // OpenSSL can parse a prefix; require the complete canonical SPKI encoding.
+  if (!key.export({ type: 'spki', format: 'der' }).equals(bytes)) refuse(mismatchCode);
+  return key;
+}
+
 function publicKey(input: PublicKey): KeyObject {
   try {
     if (input instanceof KeyObject) {
       if (input.type !== 'public' || input.asymmetricKeyType !== 'ed25519') refuse('PACK_PUBLISHER_UNTRUSTED');
       return input;
     }
-    if (Buffer.from(input).toString('utf8').includes('PRIVATE KEY')) refuse('PACK_PUBLISHER_UNTRUSTED');
-    let key: KeyObject;
-    if (Buffer.isBuffer(input) && !input.toString('utf8').startsWith('-----BEGIN')) key = createPublicKey({ key: input, type: 'spki', format: 'der' });
-    else key = createPublicKey(input);
-    if (key.asymmetricKeyType !== 'ed25519') refuse('PACK_PUBLISHER_UNTRUSTED');
-    return key;
+    const bytes = Buffer.from(input), text = bytes.toString('utf8');
+    if (Buffer.isBuffer(input) && !text.trimStart().startsWith('-----BEGIN')) return spkiKey(bytes);
+    const block = /^\s*-----BEGIN PUBLIC KEY-----\r?\n((?:[A-Za-z0-9+/=]+\r?\n)+)-----END PUBLIC KEY-----\s*$/u.exec(text);
+    if (!block || !Buffer.from(text, 'utf8').equals(bytes)) refuse('PACK_PUBLISHER_UNTRUSTED');
+    const base64 = block[1]!.replace(/\r?\n/g, '');
+    const der = Buffer.from(base64, 'base64');
+    if (der.toString('base64') !== base64) refuse('PACK_PUBLISHER_UNTRUSTED');
+    return spkiKey(der);
   } catch { refuse('PACK_PUBLISHER_UNTRUSTED'); }
 }
 
@@ -110,8 +122,7 @@ async function trustedKey(trust: unknown, keyId: string, signedAt: string): Prom
     if (keys.has(entry.keyId) || Date.parse(entry.notBefore) >= Date.parse(entry.notAfter)) refuse('PACK_SCHEMA_INVALID');
     const bytes = Buffer.from(entry.publicKeySpki, 'base64');
     if (bytes.toString('base64') !== entry.publicKeySpki || rawDigest(bytes) !== entry.keyId) refuse('PACK_SCHEMA_INVALID');
-    const key = publicKey(bytes);
-    if (!key.export({ type: 'spki', format: 'der' }).equals(bytes)) refuse('PACK_SCHEMA_INVALID');
+    const key = spkiKey(bytes, 'PACK_SCHEMA_INVALID');
     keys.set(entry.keyId, { entry, key });
   }
   const selected = keys.get(keyId);

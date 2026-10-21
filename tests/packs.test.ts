@@ -64,6 +64,73 @@ describe('offline pack boundary', () => {
     expect((await loader.verifyPack(verification())).manifestDigest).toBe(validated.manifestDigest);
   });
 
+  it.each(['DER', 'PEM string', 'PEM Buffer', 'PEM with surrounding whitespace', 'PEM Buffer with CRLF and whitespace'] as const)('accepts one complete Ed25519 public key: %s', async encoding => {
+    const der = keys.publicKey.export({ type: 'spki', format: 'der' });
+    const pem = keys.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+    const inputs = {
+      DER: der,
+      'PEM string': pem,
+      'PEM Buffer': Buffer.from(pem),
+      'PEM with surrounding whitespace': ' \t\r\n' + pem + '\r\n \t',
+      'PEM Buffer with CRLF and whitespace': Buffer.from(' \t\r\n' + pem.replaceAll('\n', '\r\n') + '\r\n \t'),
+    };
+    expect((await verifyPack(dir, inputs[encoding])).manifest.version).toBe('1.0.0');
+  });
+
+  it.each([
+    'DER followed by junk', 'concatenated DER keys', 'PEM followed by junk', 'PEM Buffer followed by junk',
+    'PEM preceded by junk', 'concatenated PEM keys', 'PEM containing DER followed by junk',
+    'PEM containing concatenated DER keys', 'PEM with invalid base64', 'PEM with a missing end marker', 'raw 32-byte key',
+  ] as const)('refuses incomplete or multiple public-key encodings: %s', async encoding => {
+    const der = keys.publicKey.export({ type: 'spki', format: 'der' });
+    const pem = keys.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+    const secondDer = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'der' });
+    const wrap = (bytes: Buffer) => '-----BEGIN PUBLIC KEY-----\n' + bytes.toString('base64') + '\n-----END PUBLIC KEY-----\n';
+    const inputs = {
+      'DER followed by junk': Buffer.concat([der, Buffer.from('junk')]),
+      'concatenated DER keys': Buffer.concat([der, secondDer]),
+      'PEM followed by junk': pem + 'junk',
+      'PEM Buffer followed by junk': Buffer.from(pem + 'junk'),
+      'PEM preceded by junk': 'junk\n' + pem,
+      'concatenated PEM keys': pem + pem,
+      'PEM containing DER followed by junk': wrap(Buffer.concat([der, Buffer.from('junk')])),
+      'PEM containing concatenated DER keys': wrap(Buffer.concat([der, secondDer])),
+      'PEM with invalid base64': pem.replace('\n', '\n!'),
+      'PEM with a missing end marker': pem.replace('-----END PUBLIC KEY-----', ''),
+      'raw 32-byte key': der.subarray(-32),
+    };
+    await expect(verifyPack(dir, inputs[encoding])).rejects.toMatchObject({
+      code: 'PACK_PUBLISHER_UNTRUSTED', message: 'PACK_PUBLISHER_UNTRUSTED', stack: 'PACK_PUBLISHER_UNTRUSTED', exitCode: 1,
+    });
+  });
+
+  it.each(['junk', 'second key'] as const)('refuses trailing trust-key DER bytes with the existing schema error: %s', async suffix => {
+    const der = keys.publicKey.export({ type: 'spki', format: 'der' });
+    const bytes = Buffer.concat([der, suffix === 'junk' ? Buffer.from('junk') : der]);
+    trust.keys[0]!.publicKeySpki = bytes.toString('base64');
+    trust.keys[0]!.keyId = rawDigest(bytes);
+    await expect(verifyPack(verification())).rejects.toMatchObject({
+      code: 'PACK_SCHEMA_INVALID', message: 'PACK_SCHEMA_INVALID', stack: 'PACK_SCHEMA_INVALID', exitCode: 2,
+    });
+  });
+
+  it.each(['KeyObject', 'DER', 'PEM'] as const)('refuses a non-Ed25519 key through both APIs: %s', async encoding => {
+    const other = generateKeyPairSync('x25519').publicKey;
+    const der = other.export({ type: 'spki', format: 'der' });
+    signature.proof.keyId = rawDigest(der);
+    signature.proof.proofBytes = sign(null, signatureMessage(signature), keys.privateKey).toString('base64');
+    await writeSignature();
+    trust.keys[0]!.keyId = signature.proof.keyId;
+    trust.keys[0]!.publicKeySpki = der.toString('base64');
+    const inputs = { KeyObject: other, DER: der, PEM: other.export({ type: 'spki', format: 'pem' }) };
+    await expect(verifyPack(dir, inputs[encoding])).rejects.toMatchObject({
+      code: 'PACK_PUBLISHER_UNTRUSTED', message: 'PACK_PUBLISHER_UNTRUSTED', stack: 'PACK_PUBLISHER_UNTRUSTED', exitCode: 1,
+    });
+    await expect(verifyPack(verification())).rejects.toMatchObject({
+      code: 'PACK_PUBLISHER_UNTRUSTED', message: 'PACK_PUBLISHER_UNTRUSTED', stack: 'PACK_PUBLISHER_UNTRUSTED', exitCode: 1,
+    });
+  });
+
   it('uses a fixed signature message vector and CRLF-only digest vectors', () => {
     const vector = { ...signature, manifestDigest: 'digest', signedAt: 'clock', proof: { ...signature.proof, keyId: 'key' } };
     expect(signatureMessage(vector).toString()).toBe('analytics-spine/domain-pack/v1\0digest\0key\0clock');
@@ -227,6 +294,11 @@ describe('offline pack boundary', () => {
       const verified = cli('verify', dir, '--key', keyFile);
       expect(verified.stderr).toBe('');
       expect(verified.status).toBe(0);
+      await writeFile(keyFile, Buffer.concat([Buffer.from(encoded), Buffer.from('junk')]));
+      const malformed = cli('verify', dir, '--key', keyFile);
+      expect(malformed.status).toBe(1);
+      expect(malformed.stdout).toBe('');
+      expect(malformed.stderr).toBe('PACK_PUBLISHER_UNTRUSTED\n');
     }
     const usage = cli('validate', dir, '--unknown');
     expect(usage.status).toBe(2);
