@@ -1,0 +1,10 @@
+{
+  "tamperedPayload": "Changed test content; signature must not admit these bytes.\n",
+  "unsafePaths": ["../escape.txt", "/absolute.txt", "C:/escape.txt", "C:escape.txt", "folder/../escape.txt", "folder\\escape.txt", "folder//escape.txt", "./notice.txt", "CON.txt", "trailing./file.txt", "file.txt:stream", "//server/share.txt"],
+  "badSignature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+  "unknownField": "unexpectedMember",
+  "symlinkName": "linked-payload",
+  "unknownKeyResult": "PACK_PUBLISHER_UNTRUSTED",
+  "duplicateKeyJson": "{\"schemaVersion\":1,\"schemaVersion\":1}",
+  "escapedDuplicateKeyJson": "{\"schemaVersion\":1,\"schema\\u0056ersion\":1}"
+}

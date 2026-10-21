@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analytics-spine/publisher-trust/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "schemaVersion",
+    "keys"
+  ],
+  "properties": {
+    "kind": {
+      "const": "analytics-spine-pack-publisher-trust"
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "keys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "keyId",
+          "publicKeySpki",
+          "notBefore",
+          "notAfter",
+          "state"
+        ],
+        "properties": {
+          "keyId": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "publicKeySpki": {
+            "type": "string",
+            "minLength": 1
+          },
+          "notBefore": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notAfter": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "enum": [
+              "active",
+              "retired",
+              "revoked"
+            ]
+          }
+        }
+      },
+      "minItems": 0,
+      "maxItems": 1024,
+      "uniqueItems": true
+    }
+  }
+}
